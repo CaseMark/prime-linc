@@ -85,6 +85,11 @@ jobs:
       - name: Check
         run: npm run check
 
+      - name: Install uv for kernel tests
+        run: |
+          python3 -m pip install --user uv
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
       - name: Test
         run: npm test
 

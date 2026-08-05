@@ -4,19 +4,13 @@ This page gets you from install to a useful first prime-linc session.
 
 ## Install
 
-Install the latest stable release on Linux or macOS:
+Install the latest stable release with Node.js 22.8 or newer:
 
 ```bash
-curl -fsSL https://app.primeintellect.ai/prime-linc/install.sh | sh
+npm install -g @casemark/prime-linc
 ```
 
-To try the latest beta built from `main`:
-
-```bash
-curl -fsSL https://app.primeintellect.ai/prime-linc/install.sh | sh -s -- beta
-```
-
-Both commands fetch versioned prime-linc release artifacts and install the `prime-linc` command. The inherited npm workspace identifiers in the source tree are not the public install path.
+This installs the canonical `prime-linc` command plus the compatible `linc` and `pi` aliases. The inherited workspace identifiers in the source tree are not public install paths.
 
 Then start prime-linc in the project directory you want it to work on:
 
@@ -28,7 +22,7 @@ prime-linc
 To run a source checkout instead, use Node.js 22.8.0 or newer:
 
 ```bash
-git clone https://github.com/maxsonderby/prime-linc
+git clone https://github.com/CaseMark/prime-linc.git
 cd prime-linc
 npm ci
 ./prime-linc.sh
@@ -59,7 +53,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 prime-linc
 ```
 
-You can also run `/login` and select an API-key provider to store the key in `~/.prime/agent/auth.json`.
+You can also run `/login` and select an API-key provider to store the key in `~/.prime-linc/auth.json`.
 
 See [Providers](providers.md) for all supported providers, environment variables, and cloud-provider setup.
 
@@ -101,7 +95,7 @@ prime-linc loads context files at startup. Add an `AGENTS.md` file to tell it ho
 
 prime-linc loads:
 
-- `~/.prime/agent/AGENTS.md` for global instructions
+- `~/.prime-linc/AGENTS.md` for global instructions
 - `AGENTS.md` or `CLAUDE.md` from parent directories and the current directory
 
 Restart prime-linc, or run `/reload`, after changing context files.
@@ -135,7 +129,7 @@ Use `/model` or Ctrl+L to choose a model. Use `/effort` to set the reasoning lev
 
 ### Continue Later
 
-Sessions are saved automatically under `~/.prime/agent/sessions/`:
+Sessions are saved automatically under `~/.prime-linc/sessions/`:
 
 ```bash
 prime-linc -c                  # Continue the most recent session

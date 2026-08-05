@@ -489,6 +489,7 @@ const EARLY_LAUNCH_VALUE_FLAGS = new Set([
 	"--system-prompt",
 	"--append-system-prompt",
 	"--fork",
+	"--session",
 	"--session-dir",
 	"--models",
 	"--tools",

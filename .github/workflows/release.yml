@@ -1,0 +1,66 @@
+name: Release npm package
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag reviewed main and start publisher
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="$(node -p "require('./packages/coding-agent/package.json').version")"
+          TAG="v${VERSION}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already exists; bump the version in a reviewed PR first." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Tag reviewed main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      # Pushes made with GITHUB_TOKEN intentionally do not trigger push
+      # workflows. Dispatch npm-publish.yml explicitly so npm sees one stable
+      # trusted-publisher workflow identity for manual, tag, and normal releases.
+      - name: Start isolated publisher
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh workflow run npm-publish.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          {
+            echo "## Release started"
+            echo
+            echo "- Tagged reviewed main as ${TAG}."
+            echo "- Dispatched the isolated npm Publish workflow."
+            echo "- Publishing waits at the npm-publish environment gate."
+          } >> "${GITHUB_STEP_SUMMARY}"

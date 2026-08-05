@@ -164,6 +164,7 @@ Create provider file exporting:
 
 - Add logic to fetch/parse models from provider source
 - Map to standardized `Model` interface
+- Refresh the committed catalog explicitly with `npm run generate-models -w packages/ai`; normal builds intentionally compile the committed snapshot without network access so release artifacts are reproducible.
 
 ### 5. Tests (`packages/ai/test/`)
 
@@ -196,15 +197,16 @@ Create provider file exporting:
 
 ### Steps
 
-1. **Update CHANGELOGs**: Ensure all changes since last release are documented in the `[Unreleased]` section of each affected package's CHANGELOG.md
+1. **Prepare a normal reviewed PR**: update CHANGELOGs, then run the appropriate lockstep version command (`npm run version:patch`, `version:minor`, or `version:major`). Commit the package manifests, lockfile, and changelogs in that PR.
+2. **Merge the version PR to `main`**. Direct pushes to `main` are intentionally blocked.
+3. **Run the `Release npm package` workflow from `main`**. It verifies the reviewed version is not already tagged, creates `v<version>` at `main`, and dispatches the isolated npm publisher. A manually pushed `v*` tag reaches the same publisher.
 
-2. **Run release script**:
-   ```bash
-   npm run release:patch    # Fixes and additions
-   npm run release:minor    # API breaking changes
-   ```
+### npm publishing
 
-The script handles: version bump, CHANGELOG finalization, commit, tag, publish, and adding new `[Unreleased]` sections.
+- The public package is `@casemark/prime-linc` — one standalone tarball staged from `packages/coding-agent` by `scripts/publish.mjs`.
+- The package exposes `prime-linc`, `linc`, and `pi` as CLI aliases and ships the bundled skills plus extension examples required by Bastion.
+- The JS bundles inline the customized `@earendil-works/pi-*` workspaces; only native/interop-sensitive packages remain install-time dependencies.
+- Publishing runs under the `npm-publish` GitHub environment with provenance. Build/test/pack runs without credentials; only the separate artifact-publish job receives OIDC or the one-time bootstrap token. The first package creation can temporarily use an environment `NPM_TOKEN`; remove it after configuring npm trusted publishing for `npm-publish.yml`. See `docs/npm-publishing.md`.
 
 ## **CRITICAL** Git Rules for Parallel Agents **CRITICAL**
 

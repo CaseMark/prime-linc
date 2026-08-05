@@ -443,6 +443,9 @@ function parseSessionOption(
 	if (arg.startsWith("--resume=")) {
 		return withSessionSelector(arg.slice("--resume=".length), 0);
 	}
+	if (arg.startsWith("--session=")) {
+		return withSessionSelector(arg.slice("--session=".length), 0);
+	}
 
 	switch (arg) {
 		case "--continue":
@@ -450,6 +453,8 @@ function parseSessionOption(
 			return { consumed: 0, continueRecent: true };
 		case "--resume":
 		case "-r":
+		// Linc compatibility alias: an explicit session file path.
+		case "--session":
 			return withSessionSelector(readValue(), 1);
 		case "--session-dir":
 			return withParsedValue(arg, (value) => {

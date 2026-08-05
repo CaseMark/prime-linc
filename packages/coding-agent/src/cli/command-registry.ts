@@ -188,6 +188,7 @@ const TOP_LEVEL_OPTION_GROUPS: ReadonlyArray<{ heading: string; options: readonl
 			["-c, --continue", "Continue the previous session"],
 			["-r, --resume <path|id>", "Resume a saved session"],
 			["--fork <path|id>", "Fork a saved session into a new session"],
+			["--session <path>", "Use an explicit session file, creating it when absent"],
 			["--session-dir <dir>", "Use a custom session directory"],
 			["--no-session", "Do not save the session"],
 			["--goal <objective>", "Seed a persistent goal for a new root session"],

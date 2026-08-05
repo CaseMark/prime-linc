@@ -204,7 +204,13 @@ Create provider file exporting:
    npm run release:minor    # API breaking changes
    ```
 
-The script handles: version bump, CHANGELOG finalization, commit, tag, publish, and adding new `[Unreleased]` sections.
+The script handles: version bump, CHANGELOG finalization, commit, tag, and adding new `[Unreleased]` sections. It pushes `main` and the `v<version>` tag.
+
+### npm publishing
+
+- The published npm package is `@casemark/prime-linc` — a single standalone tarball built from `packages/coding-agent` by `scripts/publish.mjs`.
+- The bundles (`dist/bundle` for the `prime-linc` bin, `dist/bundle-lib` for the library entry) inline the customized `@earendil-works/pi-*` workspaces, so the published package has only real external runtime deps (`zeromq`, `undici`, `@silvia-odwyer/photon-node`).
+- Pushing the `v<version>` tag triggers the `npm Publish` GitHub Actions workflow, which runs `scripts/publish.mjs` under the `npm-publish` environment with OIDC provenance. Publishing requires the `npm-publish` environment to be approved (see `.github/workflows/npm-publish.yml`).
 
 ## **CRITICAL** Git Rules for Parallel Agents **CRITICAL**
 

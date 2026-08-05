@@ -31,6 +31,8 @@ export const VIRTUAL_MODULES: Record<string, unknown> = {
 	"@earendil-works/pi-ai": _bundledPiAi,
 	"@earendil-works/pi-ai/oauth": _bundledPiAiOauth,
 	"@earendil-works/pi-coding-agent": _bundledPiCodingAgent,
+	"@casemark/prime-linc": _bundledPiCodingAgent,
+	"@casemark/prime-linc/hooks": _bundledPiCodingAgent,
 	"@mariozechner/pi-agent-core": _bundledPiAgentCore,
 	"@mariozechner/pi-tui": _bundledPiTui,
 	"@mariozechner/pi-ai": _bundledPiAi,

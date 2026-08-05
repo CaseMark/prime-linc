@@ -100,11 +100,11 @@
 		"tui",
 		"agent"
 	],
-	"author": "Mario Zechner",
+	"author": "CaseMark",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/maxsonderby/prime-linc.git",
+		"url": "git+https://github.com/CaseMark/prime-linc.git",
 		"directory": "packages/coding-agent"
 	},
 	"engines": {

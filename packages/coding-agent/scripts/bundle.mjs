@@ -10,6 +10,10 @@
  * Extension loading inside the bundle uses jiti virtualModules (same as the
  * compiled Bun binary), keyed off the __PI_BUNDLED__ define below, so extension
  * imports of pi packages share the bundle's module instances.
+ *
+ * Two outputs: dist/bundle/ (CLI bin entry) and dist/bundle-lib/ (library
+ * consumer entry). Both inline the customized pi-* workspaces so the published
+ * package is installable standalone.
  */
 import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -18,7 +22,8 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const outdir = join(packageDir, "dist", "bundle");
+const cliOutdir = join(packageDir, "dist", "bundle");
+const libOutdir = join(packageDir, "dist", "bundle-lib");
 let buildId;
 try {
 	buildId = execFileSync("git", ["describe", "--tags", "--always", "--dirty"], {
@@ -29,24 +34,52 @@ try {
 	buildId = `release-${JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")).version}`;
 }
 
-rmSync(outdir, { recursive: true, force: true });
+// Shared esbuild options. The bundle is self-contained: packages/ai,
+// packages/agent, and packages/tui are inlined (they are customized forks that
+// are not published under their @earendil-works/pi-* names), so a standalone
+// npm package only needs the native/interop-sensitive externals below at
+// install time.
+const external = ["zeromq", "koffi", "undici", "@silvia-odwyer/photon-node", "@mariozechner/clipboard"];
+const define = { __PI_BUNDLED__: "true", __PI_BUILD_ID__: JSON.stringify(buildId) };
+const banner = {
+	js: "import { createRequire as __piBundleCreateRequire } from 'node:module'; const require = __piBundleCreateRequire(import.meta.url);",
+};
+
+rmSync(cliOutdir, { recursive: true, force: true });
 
 await build({
 	entryPoints: [join(packageDir, "dist", "cli.js")],
-	outdir,
+	outdir: cliOutdir,
 	bundle: true,
 	splitting: true,
 	format: "esm",
 	platform: "node",
-	// Native or interop-sensitive packages stay external; they resolve from
-	// node_modules at runtime (and are loaded via createRequire/lazily anyway).
-	external: ["zeromq", "koffi", "undici", "@silvia-odwyer/photon-node", "@mariozechner/clipboard"],
-	define: { __PI_BUNDLED__: "true", __PI_BUILD_ID__: JSON.stringify(buildId) },
-	banner: {
-		js: "import { createRequire as __piBundleCreateRequire } from 'node:module'; const require = __piBundleCreateRequire(import.meta.url);",
-	},
+	external,
+	define,
+	banner,
 	logLevel: "warning",
 });
 
-chmodSync(join(outdir, "cli.js"), 0o755);
+chmodSync(join(cliOutdir, "cli.js"), 0o755);
 console.log("bundled dist/cli.js -> dist/bundle/");
+
+// Library consumers import the package by name; bundle dist/index.js the same
+// way so `import "@casemark/prime-linc"` (and its exports map) do not require
+// the unpublished @earendil-works/pi-* workspaces at install time.
+rmSync(libOutdir, { recursive: true, force: true });
+
+await build({
+	entryPoints: [join(packageDir, "dist", "index.js")],
+	outdir: libOutdir,
+	bundle: true,
+	splitting: true,
+	format: "esm",
+	platform: "node",
+	external,
+	define,
+	banner,
+	logLevel: "warning",
+});
+
+chmodSync(join(libOutdir, "index.js"), 0o755);
+console.log("bundled dist/index.js -> dist/bundle-lib/");

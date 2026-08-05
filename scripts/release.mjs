@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release script for pi-mono
+ * Release script for prime-linc
  *
  * Usage:
  *   node scripts/release.mjs <major|minor|patch>
@@ -11,9 +11,9 @@
  * 2. Bump version via npm run version:xxx or set an explicit version
  * 3. Update CHANGELOG.md files: [Unreleased] -> [version] - date
  * 4. Commit and tag
- * 5. Publish to npm
- * 6. Add new [Unreleased] section to changelogs
- * 7. Commit
+ * 5. Add new [Unreleased] section to changelogs
+ * 6. Commit
+ * 7. Push main and the tag (the npm Publish workflow publishes to npm from the tag)
  */
 
 import { execSync } from "child_process";
@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 
 const RELEASE_TARGET = process.argv[2];
+const RELEASE_REMOTE = process.env.RELEASE_REMOTE || "origin";
 const BUMP_TYPES = new Set(["major", "minor", "patch"]);
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
@@ -62,7 +63,7 @@ function compareVersions(a, b) {
 }
 
 function shellQuote(value) {
-	return `'${value.replace(/'/g, `'\\''`)}'`;
+	return `'${value.replace(/'/g, `'\''`)}'`;
 }
 
 function stageChangedFiles() {
@@ -91,7 +92,7 @@ function bumpOrSetVersion(target) {
 
 	console.log(`Setting explicit version (${target})...`);
 	run(
-		`npm version ${target} -ws --no-git-tag-version && node scripts/sync-versions.js && npx shx rm -rf node_modules packages/*/node_modules package-lock.json && npm install`,
+		`npm version ${target} -ws --no-git-tag-version && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts`,
 	);
 	return getVersion();
 }
@@ -147,6 +148,11 @@ console.log("\n=== Release Script ===\n");
 
 // 1. Check for uncommitted changes
 console.log("Checking for uncommitted changes...");
+const currentBranch = (run("git branch --show-current", { silent: true }) || "").trim();
+if (currentBranch && currentBranch !== "main") {
+	console.error(`Error: releases must be prepared from main. Current branch: ${currentBranch}`);
+	process.exit(1);
+}
 const status = run("git status --porcelain", { silent: true });
 if (status && status.trim()) {
 	console.error("Error: Uncommitted changes detected. Commit or stash first.");
@@ -171,26 +177,23 @@ run(`git commit -m "Release v${version}"`);
 run(`git tag v${version}`);
 console.log();
 
-// 5. Publish
-console.log("Publishing to npm...");
-run("npm run publish");
-console.log();
+// npm publishing is done by CI (the npm Publish workflow) on the tag push.
 
-// 6. Add new [Unreleased] sections
+// 5. Add new [Unreleased] sections
 console.log("Adding [Unreleased] sections for next cycle...");
 addUnreleasedSection();
 console.log();
 
-// 7. Commit
+// 6. Commit
 console.log("Committing changelog updates...");
 stageChangedFiles();
 run(`git commit -m "Add [Unreleased] section for next cycle"`);
 console.log();
 
-// 8. Push
-console.log("Pushing to remote...");
-run("git push origin main");
-run(`git push origin v${version}`);
+// 7. Push
+console.log(`Pushing to ${RELEASE_REMOTE}...`);
+run(`git push ${RELEASE_REMOTE} HEAD:main`);
+run(`git push ${RELEASE_REMOTE} v${version}`);
 console.log();
 
-console.log(`=== Released v${version} ===`);
+console.log(`=== Prepared release v${version}; CI publishes to npm from the v${version} tag ===`);

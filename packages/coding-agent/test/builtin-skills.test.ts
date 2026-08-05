@@ -317,9 +317,19 @@ describe("builtin skills", () => {
 			expect(script).toMatch(/cp -r skills binaries\/\$platform\//);
 		});
 
-		it("release packer includes skills in the packed package", () => {
-			const script = readFileSync(join(repoRoot, "scripts", "pack-prime-linc-release.mjs"), "utf-8");
-			expect(script).toContain('"skills"');
+		it("npm publisher includes every disk-loaded runtime asset", () => {
+			const script = readFileSync(join(repoRoot, "scripts", "publish.mjs"), "utf-8");
+			for (const asset of [
+				"dist/core/export-html/template.html",
+				"dist/modes/interactive/assets/clankolas.png",
+				"dist/modes/interactive/theme/prime.json",
+				"dist/prime-agent-runtime/pyproject.toml",
+				"dist/skills/websearch/SKILL.md",
+				"examples/extensions/subagent/index.ts",
+				"docs/quickstart.md",
+			]) {
+				expect(script).toContain(asset);
+			}
 		});
 	});
 });

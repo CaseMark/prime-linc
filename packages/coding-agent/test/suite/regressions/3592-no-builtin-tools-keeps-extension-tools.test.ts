@@ -112,8 +112,18 @@ describe("regression #3592: no-builtin-tools keeps extension tools enabled", () 
 			noTools: "builtin",
 		});
 
-		expect(session.getActiveToolNames()).toEqual([]);
-		expect(session.systemPrompt).not.toContain("Available tools:");
+		expect(session.getActiveToolNames().sort()).toEqual(
+			[
+				"legal_research",
+				"skill_read",
+				"skill_search",
+				"vault_download",
+				"vault_list",
+				"vault_search",
+				"vault_upload",
+				"web_search",
+			].sort(),
+		);
 		expect(session.systemPrompt).not.toContain("- ipython:");
 		session.dispose();
 	});

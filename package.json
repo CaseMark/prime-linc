@@ -25,12 +25,8 @@
 		"version:major": "npm version major -ws --no-git-tag-version && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",
 		"version:set": "npm version -ws",
 		"prepublishOnly": "npm run clean && npm run build && npm run check",
-		"publish": "node scripts/publish.mjs",
 		"publish:dry": "node scripts/publish.mjs --dry-run",
 		"release:pack": "node scripts/pack-prime-linc-release.mjs",
-		"release:patch": "node scripts/release.mjs patch",
-		"release:minor": "node scripts/release.mjs minor",
-		"release:major": "node scripts/release.mjs major",
 		"prepare": "husky"
 	},
 	"devDependencies": {

@@ -7,7 +7,7 @@ See the repository [AGENTS.md](../../../AGENTS.md) for the current contribution 
 prime-linc requires Node.js 22.8.0 or newer.
 
 ```bash
-git clone https://github.com/maxsonderby/prime-linc
+git clone https://github.com/CaseMark/prime-linc.git
 cd prime-linc
 npm ci
 ```
@@ -24,11 +24,11 @@ The script can be called from any directory and preserves the caller's working d
 
 prime-linc is the product, public CLI, release artifact, and repository name. The monorepo still retains inherited `@earendil-works/pi-*` npm workspace names, a source-package `pi` bin entry, the `pi` package manifest key, and some `PI_*` compatibility environment variables. These names are source and compatibility details, not a signal that contributors should install or develop against pi-mono.
 
-Public releases are currently versioned tarball artifacts installed by the stable and beta installer scripts. `scripts/pack-prime-linc-release.mjs` rewrites the coding-agent package name, executable, config metadata, and internal dependency URLs for that distribution. Do not document the inherited npm workspace package as the public prime-linc install path.
+Public releases are the standalone `@casemark/prime-linc` npm package. `scripts/publish.mjs` stages and smoke-tests the package while bundling the customized workspaces; do not document inherited workspace package names as public install paths.
 
 ## Local Configuration
 
-User configuration lives under `~/.prime/agent/`. Project-local settings, prompts, themes, extensions, skills, and system-prompt files live under `.prime/agent/` in the project root. Override the user config directory with `PRIME_AGENT_CODING_AGENT_DIR` and the session directory with `PRIME_AGENT_SESSION_DIR`.
+User configuration lives under `~/.prime-linc/`. Project-local settings, prompts, themes, extensions, skills, and system-prompt files live under `.prime-linc/` in the project root. Override the user config directory with `PRIME_AGENT_CODING_AGENT_DIR` and the session directory with `PRIME_AGENT_SESSION_DIR`.
 
 Use an isolated config directory when manually exercising daemon behavior so development sessions do not collide with normal sessions:
 
@@ -52,7 +52,7 @@ Do not resolve packaged assets directly from `__dirname`.
 
 ## Debugging
 
-The hidden `/debug` command writes `~/.prime/agent/prime-linc-debug.log` with rendered TUI lines, their visible widths, and the current agent messages. Daemon, worker, client, and provider diagnostic logs live under `~/.prime/agent/logs/`.
+The hidden `/debug` command writes `~/.prime-linc/prime-linc-debug.log` with rendered TUI lines, their visible widths, and the current agent messages. Daemon, worker, client, and provider diagnostic logs live under `~/.prime-linc/logs/`.
 
 Useful service commands:
 

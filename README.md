@@ -4,20 +4,26 @@ case.dev-native RLM agent harness. Forked from [Prime Agent](https://github.com/
 
 One API key powers models, vaults, OCR, legal/web search, and the [casedev CLI](https://docs.case.dev/cli).
 
-## Install (this machine)
+## Install
+
+Requires Node.js 22.8 or newer:
 
 ```bash
-cd /Users/max/prime-linc
-npm install
-npm run build
-./prime-linc.sh
+npm install -g @casemark/prime-linc
+prime-linc
 ```
 
-Or after build:
+The package also exposes `linc` for CaseMark/Bastion compatibility and `pi` for
+upstream CLI compatibility.
+
+To develop from source:
 
 ```bash
-npm link -w @earendil-works/pi-coding-agent
-prime-linc
+git clone https://github.com/CaseMark/prime-linc.git
+cd prime-linc
+npm ci
+npm run build
+./prime-linc.sh
 ```
 
 Config: `~/.prime-linc/`  

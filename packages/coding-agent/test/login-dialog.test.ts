@@ -124,7 +124,7 @@ describe("LoginDialogComponent", () => {
 		expect(output).not.toContain("Status");
 	});
 
-	it("keeps the Prime Inference brand header centered and within the panel", () => {
+	it("keeps the Prime Inference compatibility header centered and within the panel", () => {
 		const dialog = new LoginDialogComponent(createFakeTui(), "prime-inference", () => {}, "Prime Inference");
 
 		dialog.showProgress("Checking existing Prime CLI credentials...");
@@ -134,7 +134,7 @@ describe("LoginDialogComponent", () => {
 		const titleOffset = titleLine?.indexOf("Login to Prime Inference") ?? -1;
 
 		expect(titleOffset).toBeGreaterThan(20);
-		expect(output).toContain("Connect your Prime Intellect account to enable Prime Inference models.");
+		expect(output).toContain("Optional. Prefer case.dev login for prime-linc.");
 		expect(output).toContain("Preparing authentication");
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBe(88);

@@ -60,7 +60,7 @@ describe("OAuthSelectorComponent", () => {
 		]);
 	});
 
-	it("sorts Prime Inference first within every login auth-state group", () => {
+	it("sorts login providers by auth-state group and then alphabetically", () => {
 		const cases: Array<{ status: AuthStatus; configuredProviderLeads: boolean }> = [
 			{ status: { configured: true, source: "environment" }, configuredProviderLeads: false },
 			{ status: { configured: false, source: "stale", label: "expired" }, configuredProviderLeads: true },
@@ -87,11 +87,12 @@ describe("OAuthSelectorComponent", () => {
 			const anthropicIndex = output.indexOf("Anthropic");
 			const openAiIndex = output.indexOf("OpenAI");
 
-			expect(primeIndex).toBeLessThan(anthropicIndex);
+			expect(anthropicIndex).toBeLessThan(primeIndex);
 			if (configuredProviderLeads) {
-				expect(openAiIndex).toBeLessThan(primeIndex);
+				expect(openAiIndex).toBeLessThan(anthropicIndex);
 			} else {
-				expect(primeIndex).toBeLessThan(openAiIndex);
+				expect(anthropicIndex).toBeLessThan(openAiIndex);
+				expect(openAiIndex).toBeLessThan(primeIndex);
 			}
 		}
 	});

@@ -1,103 +1,66 @@
-name: Release
+name: Release npm package
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Explicit version to release, such as 0.7.1. Leave empty to use bump.'
-        required: false
-        type: string
-      bump:
-        description: 'Semver bump to use when version is empty.'
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+
+permissions: {}
 
 concurrency:
-  group: release-main
+  group: release-npm
   cancel-in-progress: false
-
-permissions:
-  contents: write
 
 jobs:
   release:
-    name: Prepare release
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event_name == 'push' &&
-          !startsWith(github.event.head_commit.message, 'Release v') &&
-          github.event.head_commit.message != 'Add [Unreleased] section for next cycle'
-        )
-      }}
+    name: Tag reviewed main and start publisher
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     steps:
-      - name: Validate release ref
-        run: |
-          if [ "${GITHUB_REF_NAME}" != "main" ]; then
-            echo "Releases must be run from main. Current ref: ${GITHUB_REF_NAME}" >&2
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install system dependencies
+      - name: Resolve version
+        id: version
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev fd-find ripgrep
-          sudo ln -s $(which fdfind) /usr/local/bin/fd
+          VERSION="$(node -p "require('./packages/coding-agent/package.json').version")"
+          TAG="v${VERSION}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already exists; bump the version in a reviewed PR first." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Configure git author
+      - name: Tag reviewed main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
 
-      - name: Resolve release target
-        id: target
+      # Pushes made with GITHUB_TOKEN intentionally do not trigger push
+      # workflows. Dispatch npm-publish.yml explicitly so npm sees one stable
+      # trusted-publisher workflow identity for manual, tag, and normal releases.
+      - name: Start isolated publisher
         env:
-          INPUT_VERSION: ${{ inputs.version || '' }}
-          INPUT_BUMP: ${{ inputs.bump || 'patch' }}
-        run: |
-          if [ -n "${INPUT_VERSION}" ]; then
-            echo "value=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "value=${INPUT_BUMP}" >> "${GITHUB_OUTPUT}"
-          fi
-
-      - name: Prepare release commits and tag
-        env:
-          npm_config_min_release_age: '0'
-        run: node scripts/release.mjs "${{ steps.target.outputs.value }}"
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh workflow run npm-publish.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
 
       - name: Summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          VERSION="$(node -p "require('./packages/coding-agent/package.json').version")"
           {
-            echo "## Release prepared"
+            echo "## Release started"
             echo
-            echo "- Version: v${VERSION}"
-            echo "- The pushed tag starts the npm Publish workflow."
-            echo "- npm publishing still requires the npm-publish environment approval."
+            echo "- Tagged reviewed main as ${TAG}."
+            echo "- Dispatched the isolated npm Publish workflow."
+            echo "- Publishing waits at the npm-publish environment gate."
           } >> "${GITHUB_STEP_SUMMARY}"

@@ -16,7 +16,7 @@ See [examples/sdk/](../examples/sdk/) for working examples from minimal to full 
 ## Quick Start
 
 ```typescript
-import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "@casemark/prime-linc";
 
 // Set up credential storage and model registry
 const authStorage = AuthStorage.create();
@@ -40,7 +40,7 @@ await session.prompt("What files are in the current directory?");
 ## Installation
 
 ```bash
-npm install @earendil-works/pi-coding-agent
+npm install @casemark/prime-linc
 ```
 
 The SDK is included in the main package. No separate installation needed.
@@ -54,7 +54,7 @@ The main factory function for a single `AgentSession`.
 `createAgentSession()` uses a `ResourceLoader` to supply extensions, skills, prompt templates, themes, and context files. If you do not provide one, it uses `DefaultResourceLoader` with standard discovery.
 
 ```typescript
-import { createAgentSession } from "@earendil-works/pi-coding-agent";
+import { createAgentSession } from "@casemark/prime-linc";
 
 // Minimal: defaults with DefaultResourceLoader
 const { session } = await createAgentSession();
@@ -132,7 +132,7 @@ import {
   createAgentSessionServices,
   getAgentDir,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({ cwd });
@@ -338,23 +338,23 @@ const { session } = await createAgentSession({
   cwd: process.cwd(), // default
   
   // Global config directory
-  agentDir: "~/.prime/agent", // default (expands ~)
+  agentDir: "~/.prime-linc", // default (expands ~)
 });
 ```
 
 `cwd` is used by `DefaultResourceLoader` for:
-- Project extensions (`.prime/agent/extensions/`)
+- Project extensions (`.prime-linc/extensions/`)
 - Project skills:
-  - `.prime/agent/skills/`
+  - `.prime-linc/skills/`
   - `.agents/skills/` in `cwd` and ancestor directories (up to git repo root, or filesystem root when not in a repo)
-- Project prompts (`.prime/agent/prompts/`)
+- Project prompts (`.prime-linc/prompts/`)
 - Context files (`AGENTS.md` walking up from cwd)
 - Session storage resolution
 
 `agentDir` is used by `DefaultResourceLoader` for:
 - Global extensions (`extensions/`)
 - Global skills:
-  - `skills/` under `agentDir` (for example `~/.prime/agent/skills/`)
+  - `skills/` under `agentDir` (for example `~/.prime-linc/skills/`)
   - `~/.agents/skills/`
 - Global prompts (`prompts/`)
 - Global context file (`AGENTS.md`)
@@ -369,7 +369,7 @@ When you pass a custom `ResourceLoader`, `cwd` and `agentDir` no longer control 
 
 ```typescript
 import { getModel } from "@earendil-works/pi-ai";
-import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, ModelRegistry } from "@casemark/prime-linc";
 
 const authStorage = AuthStorage.create();
 const modelRegistry = ModelRegistry.create(authStorage);
@@ -416,9 +416,9 @@ API key resolution priority (handled by AuthStorage):
 4. Fallback resolver (for custom provider keys from `models.json`)
 
 ```typescript
-import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, ModelRegistry } from "@casemark/prime-linc";
 
-// Default: uses ~/.prime/agent/auth.json and ~/.prime/agent/models.json
+// Default: uses ~/.prime-linc/auth.json and ~/.prime-linc/models.json
 const authStorage = AuthStorage.create();
 const modelRegistry = ModelRegistry.create(authStorage);
 
@@ -452,7 +452,7 @@ const simpleRegistry = ModelRegistry.inMemory(authStorage);
 Use a `ResourceLoader` to override the system prompt:
 
 ```typescript
-import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader } from "@casemark/prime-linc";
 
 const loader = new DefaultResourceLoader({
   systemPromptOverride: () => "You are a helpful assistant.",
@@ -487,7 +487,7 @@ import {
   createIpythonToolDefinition,
   createBashToolDefinition,
   createEditToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const cwd = "/path/to/project";
 
@@ -514,7 +514,7 @@ const { session } = await createAgentSession({
 
 ```typescript
 import { Type } from "typebox";
-import { createAgentSession, defineTool } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, defineTool } from "@casemark/prime-linc";
 
 // Inline custom tool
 const myTool = defineTool({
@@ -544,10 +544,10 @@ Custom tools passed via `customTools` are combined with extension-registered too
 
 ### Extensions
 
-Extensions are loaded by the `ResourceLoader`. `DefaultResourceLoader` discovers extensions from `~/.prime/agent/extensions/`, `.prime/agent/extensions/`, and `settings.json` extension sources.
+Extensions are loaded by the `ResourceLoader`. `DefaultResourceLoader` discovers extensions from `~/.prime-linc/extensions/`, `.prime-linc/extensions/`, and `settings.json` extension sources.
 
 ```typescript
-import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader } from "@casemark/prime-linc";
 
 const loader = new DefaultResourceLoader({
   additionalExtensionPaths: ["/path/to/my-extension.ts"],
@@ -569,7 +569,7 @@ Extensions can register tools, subscribe to events, add commands, and more. See 
 **Event Bus:** Extensions can communicate via `pi.events`. Pass a shared `eventBus` to `DefaultResourceLoader` if you need to emit or listen from outside:
 
 ```typescript
-import { createEventBus, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { createEventBus, DefaultResourceLoader } from "@casemark/prime-linc";
 
 const eventBus = createEventBus();
 const loader = new DefaultResourceLoader({
@@ -589,7 +589,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   type Skill,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const customSkill: Skill = {
   name: "my-skill",
@@ -615,7 +615,7 @@ const { session } = await createAgentSession({ resourceLoader: loader });
 ### Context Files
 
 ```typescript
-import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader } from "@casemark/prime-linc";
 
 const loader = new DefaultResourceLoader({
   agentsFilesOverride: (current) => ({
@@ -639,7 +639,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   type PromptTemplate,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const customCommand: PromptTemplate = {
   name: "deploy",
@@ -674,7 +674,7 @@ import {
   createAgentSessionServices,
   getAgentDir,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 // In-memory (no persistence)
 const { session } = await createAgentSession({
@@ -768,7 +768,7 @@ sm.createBranchedSession(leafId);       // Extract path to new file
 ### Settings Management
 
 ```typescript
-import { createAgentSession, SettingsManager, SessionManager } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, SettingsManager, SessionManager } from "@casemark/prime-linc";
 
 // Default: loads from files (global + project merged)
 const { session } = await createAgentSession({
@@ -802,8 +802,8 @@ const { session } = await createAgentSession({
 **Project-specific settings:**
 
 Settings load from two locations and merge:
-1. Global: `~/.prime/agent/settings.json`
-2. Project: `<cwd>/.prime/agent/settings.json`
+1. Global: `~/.prime-linc/settings.json`
+2. Project: `<cwd>/.prime-linc/settings.json`
 
 Project overrides global. Nested objects merge keys. Setters modify global settings by default.
 
@@ -824,7 +824,7 @@ Use `DefaultResourceLoader` to discover extensions, skills, prompts, themes, and
 import {
   DefaultResourceLoader,
   getAgentDir,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const loader = new DefaultResourceLoader({
   cwd,
@@ -875,7 +875,7 @@ import {
   ModelRegistry,
   SessionManager,
   SettingsManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 // Set up auth storage (custom location)
 const authStorage = AuthStorage.create("/custom/agent/auth.json");
@@ -960,7 +960,7 @@ import {
   getAgentDir,
   InteractiveMode,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({ cwd });
@@ -1000,7 +1000,7 @@ import {
   getAgentDir,
   runPrintMode,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({ cwd });
@@ -1037,7 +1037,7 @@ import {
   getAgentDir,
   runRpcMode,
   SessionManager,
-} from "@earendil-works/pi-coding-agent";
+} from "@casemark/prime-linc";
 
 const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({ cwd });

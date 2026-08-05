@@ -88,6 +88,8 @@
 		"@types/node": "^24.3.0",
 		"@types/proper-lockfile": "^4.1.4",
 		"esbuild": "^0.28.1",
+		"rollup": "4.62.3",
+		"rollup-plugin-dts": "6.2.1",
 		"shx": "^0.4.0",
 		"typescript": "^5.7.3",
 		"vitest": "^4.1.9"

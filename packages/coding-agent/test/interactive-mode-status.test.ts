@@ -2964,7 +2964,9 @@ describe("InteractiveMode Prime CLI onboarding", () => {
 		checkDaxnutsEasterEgg?: (model: { provider: string; id: string }) => void;
 		findExactModelMatch?: (searchTerm: string) => Promise<AgentConnectionModel | undefined>;
 		showOnboardingSplash?: (continueActionLabel?: string) => Promise<OnboardingSplashHandle | undefined>;
-		createAuthFlows?: () => { runPrimeInferenceLogin(): Promise<AuthenticationResult> };
+		createAuthFlows?: () => {
+			loginProvider(options: { id: string; name: string; authType: "api_key" }): Promise<AuthenticationResult>;
+		};
 		showConfigurationMenu?: (tab: "providers" | "models" | "mcp-connections") => Promise<void>;
 		getModelCandidates?: () => Promise<AgentConnectionModel[]>;
 	};
@@ -3722,22 +3724,21 @@ describe("InteractiveMode Prime CLI onboarding", () => {
 		expect(fakeThis.showConfigurationMenu).toHaveBeenCalledWith("models");
 	});
 
-	test("opens Prime login before the Models tab when no models are available", async () => {
+	test("opens case.dev login before the Models tab when no models are available", async () => {
 		const fakeThis = createPrimeCliHarness(false);
 		fakeThis.connectionState = createConnectionState({ model: undefined });
 		fakeThis.getModelCandidates = vi.fn(async () => []);
 		const showProgress = vi.fn();
 		const dismiss = vi.fn();
 		fakeThis.showOnboardingSplash = vi.fn(async () => ({ showProgress, dismiss }));
-		fakeThis.createAuthFlows = vi.fn(() => ({
-			runPrimeInferenceLogin: vi.fn(async () => ({
-				status: "success" as const,
-				providerId: PRIME_INFERENCE_PROVIDER_ID,
-				providerName: "Prime Inference",
-				authType: "api_key" as const,
-				kind: "provider" as const,
-			})),
+		const loginProvider = vi.fn(async () => ({
+			status: "success" as const,
+			providerId: "casedev",
+			providerName: "case.dev",
+			authType: "api_key" as const,
+			kind: "provider" as const,
 		}));
+		fakeThis.createAuthFlows = vi.fn(() => ({ loginProvider }));
 		fakeThis.prepareForModelSelectionAfterLogin = vi.fn(async () => true);
 		const configuration = createDeferred<void>();
 		fakeThis.showConfigurationMenu = vi.fn(() => configuration.promise);
@@ -3746,7 +3747,8 @@ describe("InteractiveMode Prime CLI onboarding", () => {
 		await flushAsyncWork();
 
 		expect(fakeThis.showOnboardingSplash).toHaveBeenCalledWith();
-		expect(showProgress).toHaveBeenNthCalledWith(1, "Signing in to Prime Intellect...");
+		expect(showProgress).toHaveBeenNthCalledWith(1, "Signing in to case.dev...");
+		expect(loginProvider).toHaveBeenCalledWith(expect.objectContaining({ id: "casedev", name: "case.dev" }));
 		expect(showProgress).toHaveBeenNthCalledWith(2, "Preparing models...");
 		expect(fakeThis.prepareForModelSelectionAfterLogin).toHaveBeenCalledTimes(1);
 		expect(fakeThis.showConfigurationMenu).toHaveBeenCalledWith("models");

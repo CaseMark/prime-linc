@@ -22,7 +22,7 @@ interface InteractiveOnboardingHarness {
 	getModelCandidates(): Promise<AgentConnectionModel[]>;
 	showOnboardingSplash(continueActionLabel?: string): Promise<OnboardingSplashHandle | undefined>;
 	createAuthFlows(): {
-		runPrimeInferenceLogin(): Promise<AuthenticationResult>;
+		loginProvider(options: { id: string; name: string; authType: "api_key" }): Promise<AuthenticationResult>;
 	};
 	prepareForModelSelectionAfterLogin(authResult: AuthenticationResult): Promise<boolean>;
 	showConfigurationMenu(tab: "providers" | "models" | "mcp-connections"): Promise<void>;
@@ -84,12 +84,12 @@ describe("ENG-4658 onboarding transitions", () => {
 		fakeThis.getModelCandidates = vi.fn(async () => []);
 		fakeThis.showOnboardingSplash = vi.fn(async () => splash);
 		fakeThis.createAuthFlows = vi.fn(() => ({
-			runPrimeInferenceLogin: async (): Promise<AuthenticationResult> => {
+			loginProvider: async (): Promise<AuthenticationResult> => {
 				order.push("login");
 				return {
 					status: "success",
-					providerId: "prime-inference",
-					providerName: "Prime Inference",
+					providerId: "casedev",
+					providerName: "case.dev",
 					authType: "api_key",
 					kind: "provider",
 				};
@@ -113,7 +113,7 @@ describe("ENG-4658 onboarding transitions", () => {
 
 		expect(fakeThis.showOnboardingSplash).toHaveBeenCalledWith();
 		expect(order).toEqual([
-			"progress:Signing in to Prime Intellect...",
+			"progress:Signing in to case.dev...",
 			"login",
 			"progress:Preparing models...",
 			"prepare",

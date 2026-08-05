@@ -472,7 +472,7 @@ describe("default model selection", () => {
 		expect(result.thinkingLevel).toBe("medium");
 	});
 
-	test("findInitialModel prefers GLM 5.2 when Prime Inference is configured", async () => {
+	test("findInitialModel prefers the case.dev default over legacy Prime Inference", async () => {
 		const anthropicModel: Model<"anthropic-messages"> = {
 			...mockModels[0],
 			id: "claude-opus-4-7",
@@ -490,8 +490,20 @@ describe("default model selection", () => {
 			contextWindow: 1048576,
 			maxTokens: 101376,
 		};
+		const caseDevModel: Model<"openai-completions"> = {
+			id: "anthropic/claude-sonnet-4.5",
+			name: "Claude Sonnet 4.5",
+			api: "openai-completions",
+			provider: "casedev",
+			baseUrl: "https://api.case.dev/llm/v1",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200000,
+			maxTokens: 16384,
+		};
 		const registry = {
-			refreshAvailableModels: async () => [anthropicModel, primeModel],
+			refreshAvailableModels: async () => [anthropicModel, primeModel, caseDevModel],
 		} as unknown as Parameters<typeof findInitialModel>[0]["modelRegistry"];
 
 		const result = await findInitialModel({
@@ -500,7 +512,7 @@ describe("default model selection", () => {
 			modelRegistry: registry,
 		});
 
-		expect(result.model).toBe(primeModel);
+		expect(result.model).toBe(caseDevModel);
 	});
 
 	test("findInitialModel uses another provider default when Prime Inference is not configured", async () => {

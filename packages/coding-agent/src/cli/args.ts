@@ -145,6 +145,11 @@ export function parseArgs(args: string[]): Args {
 			result.noSession = true;
 		} else if (arg === "--fork" && i + 1 < args.length) {
 			result.fork = args[++i];
+		} else if (arg === "--session" && i + 1 < args.length) {
+			// Linc compatibility: `--session <path>` names an explicit session file,
+			// creating it when absent. Path selectors already resolve directly, so
+			// this is an alias of the resume selector rather than a second code path.
+			result.resume = args[++i];
 		} else if (arg === "--session-dir" && i + 1 < args.length) {
 			result.sessionDir = args[++i];
 		} else if (arg === "--models" && i + 1 < args.length) {

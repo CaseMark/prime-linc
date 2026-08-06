@@ -1,7 +1,6 @@
 import { loginCasedev } from "@earendil-works/pi-ai/oauth";
 import type { ExtensionFactory, ProviderConfig, ProviderModelConfig } from "../core/extensions/types.js";
 import { mirrorCasedevCliKey, resolveCasedevEnvApiKey } from "./auth.js";
-import { createCaseDevToolsExtension } from "./case-dev-tools.js";
 import { CASEDEV_DEFAULT_MODEL_ID, CASEDEV_LLM_BASE, CASEDEV_PROVIDER_ID, CASEDEV_PROVIDER_NAME } from "./constants.js";
 
 function fallbackModels(baseUrl: string): ProviderModelConfig[] {
@@ -123,11 +122,6 @@ export function createCasedevExtension(options?: {
 	cwd?: string;
 	getApiKey?: () => Promise<string | undefined> | string | undefined;
 }): ExtensionFactory {
-	const tools = createCaseDevToolsExtension({
-		cwd: options?.cwd,
-		getApiKey: options?.getApiKey,
-	});
-
 	return async (pi) => {
 		const getApiKey = async () => {
 			const value = await options?.getApiKey?.();
@@ -135,6 +129,5 @@ export function createCasedevExtension(options?: {
 		};
 		const config = await buildCasedevProviderConfig(getApiKey);
 		pi.registerProvider(CASEDEV_PROVIDER_ID, config);
-		await tools(pi);
 	};
 }

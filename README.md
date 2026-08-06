@@ -42,7 +42,7 @@ Env: `CASE_API_KEY`, `CASEDEV_API_KEY`, optional `CASEDEV_API_BASE_URL`.
 ## case.dev-native
 
 - Default model provider: case.dev (`api.case.dev/llm/v1`)
-- Built-in tools: `vault_list`, `vault_search`, `vault_download`, `vault_upload`, `legal_research`, `web_search`, `skill_search`, `skill_read`
+- Built-in model-facing tool: persistent IPython only; Case.dev workflows run through the `casedev` CLI in `%%bash` cells
 - Identity/system prompt: prime-linc + case.dev
 - Daemon sockets / user-agent isolated from upstream Prime Agent
 

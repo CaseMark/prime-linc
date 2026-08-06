@@ -50,13 +50,13 @@ describe("buildRlmPrompt", () => {
 			[
 				"You are prime-linc, a case.dev-native RLM agent for coding and legal AI workflows.",
 				"You solve tasks by breaking down problems into sub-tasks, writing and executing code, observing results, and iterating one step at a time.",
-				"Prefer case.dev tools and the `casedev` CLI for vaults, OCR, transcription, legal research, web search, and skills when those workflows apply.",
+				"Use the `casedev` CLI through `%%bash` cells in IPython for vaults, OCR, transcription, legal research, web search, and skills when those workflows apply.",
 				"When you are done, stop calling tools and state your final answer.",
 				"",
 				"## case.dev",
 				"Models, vaults, OCR, transcription, legal/web search, and skills are powered by case.dev.",
-				"Built-in tools: `vault_list`, `vault_search`, `vault_download`, `vault_upload`, `legal_research`, `web_search`, `skill_search`, `skill_read`.",
-				"CLI: `casedev` (docs: https://docs.case.dev/cli). Auth is shared with prime-linc via case.dev API key.",
+				"Prime-linc exposes IPython as its sole built-in model-facing tool. Run `casedev` from a `%%bash` cell instead of relying on fixed Case.dev tool schemas.",
+				"CLI: `casedev` (docs: https://docs.case.dev/cli). Auth is shared with prime-linc via the case.dev API key.",
 				"If `casedev` is missing, tell the user to install it: `brew install casemark/casedev/casedev` or https://docs.case.dev/cli",
 				"",
 				"Working directory: /repo",
@@ -92,6 +92,9 @@ describe("buildRlmPrompt", () => {
 				"Treat continual harness refinement as a small, evidence-backed update after observing a repeated failure or reusable tactic: diagnose the issue, update the smallest relevant continual harness component, validate on the next action, then record the outcome. Use `await refine.run()` to turn repeated delegation patterns into reusable subagent specs, repeated procedures into skills, durable facts/preferences into memories, and narrow behavioral policies into prompt addendums. It returns immediately and runs when the current turn ends, so continue working normally after calling it. Do not rewrite the whole continual harness when a focused memory, skill, prompt note, or subagent spec is enough.",
 			].join("\n"),
 		);
+		expect(prompt).toContain("`casedev` CLI through `%%bash` cells in IPython");
+		expect(prompt).not.toContain("`vault_list`");
+		expect(prompt).not.toContain("Built-in tools:");
 	});
 
 	test("defaults omitted activeTools to ipython guidance", () => {

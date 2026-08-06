@@ -9,7 +9,7 @@ One API key powers models, vaults, OCR, legal/web search, and the [casedev CLI](
 Requires Node.js 22.8 or newer:
 
 ```bash
-npm install -g @casemark/prime-linc
+npm install -g https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 prime-linc
 ```
 
@@ -50,6 +50,7 @@ Env: `CASE_API_KEY`, `CASEDEV_API_KEY`, optional `CASEDEV_API_BASE_URL`.
 
 - [case.dev](https://case.dev) · [docs](https://docs.case.dev) · [CLI](https://docs.case.dev/cli)
 - Local agent docs: `packages/coding-agent/docs/`
+- [Release and verification process](docs/releases.md)
 
 ## License
 

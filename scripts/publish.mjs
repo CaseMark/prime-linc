@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds and validates the @casemark/prime-linc npm tarball.
+ * Builds and validates the @casemark/prime-linc npm-compatible release tarball.
  *
  * The monorepo keeps its inherited @earendil-works/pi-* source package names
  * (type resolution uses tsconfig paths, and the esbuild bundle inlines the
@@ -8,9 +8,9 @@
  * therefore a single standalone tarball: both the bin entry and the library
  * entry point at the self-contained bundles produced by scripts/bundle.mjs.
  *
- * Publishing is intentionally performed by the locked-down GitHub Actions
- * publish job, which receives the already-validated tarball and never executes
- * repository code with registry credentials.
+ * Publishing is intentionally performed by the locked-down GitHub Release job,
+ * which receives the already-validated tarball and never checks out or executes
+ * repository code with release credentials.
  *
  * Usage:
  *   node scripts/publish.mjs --dry-run

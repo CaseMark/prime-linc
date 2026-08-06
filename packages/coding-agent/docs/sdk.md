@@ -40,7 +40,7 @@ await session.prompt("What files are in the current directory?");
 ## Installation
 
 ```bash
-npm install @casemark/prime-linc
+npm install https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 ```
 
 The SDK is included in the main package. No separate installation needed.

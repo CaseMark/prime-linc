@@ -35,8 +35,9 @@ Production consumers must pin both the tag and checksum:
 
 ```bash
 VERSION=v0.7.0
-curl -fL -o prime-linc.tgz   "https://github.com/CaseMark/prime-linc/releases/download/${VERSION}/prime-linc.tgz"
-curl -fL -o SHA256SUMS   "https://github.com/CaseMark/prime-linc/releases/download/${VERSION}/SHA256SUMS"
+curl -fL -o prime-linc.tgz "https://github.com/CaseMark/prime-linc/releases/download/${VERSION}/prime-linc.tgz"
+curl -fL -o release.json "https://github.com/CaseMark/prime-linc/releases/download/${VERSION}/release.json"
+curl -fL -o SHA256SUMS "https://github.com/CaseMark/prime-linc/releases/download/${VERSION}/SHA256SUMS"
 sha256sum -c SHA256SUMS
 npm install -g ./prime-linc.tgz
 ```
@@ -52,16 +53,16 @@ than the moving `latest` URL.
 3. Run the **Release prime-linc** GitHub Actions workflow from `main`.
 
 The workflow tags the reviewed commit as `v<version>` and dispatches the
-separate **GitHub Release** workflow. A human-pushed `v*` tag reaches that same
-publisher. The publisher rejects tag/version mismatches and tags outside
-reviewed `main` history.
+separate **GitHub Release** workflow. The publisher rejects tag/version
+mismatches and tags outside reviewed `main` history.
 
 The release workflow builds, checks, tests, packs, and clean-install smoke-tests
-without write credentials. It passes the tarball and `SHA256SUMS` through a
-GitHub Actions artifact to a separate environment-gated job that does not check
-out or execute repository code. That job creates a draft release, verifies or
-uploads the two exact assets, then publishes it. Repository release immutability
-locks the tag and assets and produces a GitHub release attestation.
+without write credentials. It passes the tarball, `release.json`, and
+`SHA256SUMS` through a GitHub Actions artifact to a separate environment-gated
+job that does not check out or execute repository code. That job creates a draft release, verifies or
+uploads the three exact assets, then publishes it. Repository release immutability
+locks the tag and assets and produces a GitHub release attestation. The
+`Protect release tags` ruleset also blocks deletion or movement of `v*` tags.
 
 ## Local validation
 

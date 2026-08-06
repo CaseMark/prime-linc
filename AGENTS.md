@@ -199,7 +199,7 @@ Create provider file exporting:
 
 1. **Prepare a normal reviewed PR**: update CHANGELOGs, then run the appropriate lockstep version command (`npm run version:patch`, `version:minor`, or `version:major`). Commit the package manifests, lockfile, and changelogs in that PR.
 2. **Merge the version PR to `main`**. Direct pushes to `main` are intentionally blocked.
-3. **Run the `Release prime-linc` workflow from `main`**. It verifies the reviewed version is not already tagged, creates `v<version>` at `main`, and dispatches the isolated GitHub Release publisher. A manually pushed `v*` tag reaches the same publisher.
+3. **Run the `Release prime-linc` workflow from `main`**. It verifies the reviewed version is not already tagged, creates `v<version>` at `main`, and dispatches the isolated GitHub Release publisher.
 
 ### Release artifacts
 

@@ -1,9 +1,6 @@
 name: GitHub Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -24,6 +21,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -99,9 +98,34 @@ jobs:
           rm -rf release-artifact
           node scripts/publish.mjs --pack release-artifact/prime-linc.tgz
           cd release-artifact
-          sha256sum prime-linc.tgz > SHA256SUMS
+          NAME="$(tar -xOf prime-linc.tgz package/package.json | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).name))')"
+          VERSION="$(tar -xOf prime-linc.tgz package/package.json | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).version))')"
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          SHA256="$(sha256sum prime-linc.tgz | cut -d ' ' -f 1)"
+          INTEGRITY="sha512-$(openssl dgst -sha512 -binary prime-linc.tgz | openssl base64 -A)"
+          BYTES="$(stat -c '%s' prime-linc.tgz)"
+          NAME="${NAME}" VERSION="${VERSION}" SOURCE_COMMIT="${SOURCE_COMMIT}" \
+            SHA256="${SHA256}" INTEGRITY="${INTEGRITY}" BYTES="${BYTES}" node <<'NODE'
+          const { writeFileSync } = require("node:fs");
+          const metadata = {
+            schemaVersion: 1,
+            name: process.env.NAME,
+            version: process.env.VERSION,
+            tag: process.env.RELEASE_TAG,
+            sourceCommit: process.env.SOURCE_COMMIT,
+            asset: {
+              name: "prime-linc.tgz",
+              bytes: Number(process.env.BYTES),
+              sha256: process.env.SHA256,
+              integrity: process.env.INTEGRITY,
+            },
+          };
+          writeFileSync("release.json", `${JSON.stringify(metadata, null, 2)}\n`);
+          NODE
+          sha256sum prime-linc.tgz release.json > SHA256SUMS
 
       - name: Upload validated tarball
+        id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: prime-linc-${{ env.RELEASE_TAG }}
@@ -126,7 +150,7 @@ jobs:
       - name: Download validated tarball
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: prime-linc-${{ env.RELEASE_TAG }}
+          artifact-ids: ${{ needs.validate.outputs.artifact_id }}
           path: release-artifact
 
       - name: Verify artifact and package metadata
@@ -144,11 +168,49 @@ jobs:
             echo "Artifact version ${VERSION} does not match ${RELEASE_TAG}." >&2
             exit 1
           }
+          METADATA_NAME="$(node -p "require('./release.json').name")"
+          METADATA_VERSION="$(node -p "require('./release.json').version")"
+          METADATA_TAG="$(node -p "require('./release.json').tag")"
+          METADATA_SHA256="$(node -p "require('./release.json').asset.sha256")"
+          METADATA_INTEGRITY="$(node -p "require('./release.json').asset.integrity")"
+          METADATA_BYTES="$(node -p "require('./release.json').asset.bytes")"
+          ACTUAL_SHA256="$(sha256sum prime-linc.tgz | cut -d ' ' -f 1)"
+          ACTUAL_INTEGRITY="sha512-$(openssl dgst -sha512 -binary prime-linc.tgz | openssl base64 -A)"
+          ACTUAL_BYTES="$(stat -c '%s' prime-linc.tgz)"
+          test "${METADATA_NAME}" = "${NAME}"
+          test "${METADATA_VERSION}" = "${VERSION}"
+          test "${METADATA_TAG}" = "${RELEASE_TAG}"
+          test "${METADATA_SHA256}" = "${ACTUAL_SHA256}"
+          test "${METADATA_INTEGRITY}" = "${ACTUAL_INTEGRITY}"
+          test "${METADATA_BYTES}" = "${ACTUAL_BYTES}"
+
+      - name: Verify remote tag still matches validated source
+        run: |
+          set -euo pipefail
+          EXPECTED_COMMIT="$(node -p "require('./release-artifact/release.json').sourceCommit")"
+          OBJECT_TYPE="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.type)"
+          OBJECT_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha)"
+          for _ in $(seq 1 5); do
+            if [ "${OBJECT_TYPE}" = commit ]; then
+              break
+            fi
+            test "${OBJECT_TYPE}" = tag || {
+              echo "Unexpected ${RELEASE_TAG} object type ${OBJECT_TYPE}." >&2
+              exit 1
+            }
+            OBJECT_TYPE="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}" --jq .object.type)"
+            OBJECT_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}" --jq .object.sha)"
+          done
+          test "${OBJECT_TYPE}" = commit
+          test "${OBJECT_SHA}" = "${EXPECTED_COMMIT}" || {
+            echo "${RELEASE_TAG} moved from validated ${EXPECTED_COMMIT} to ${OBJECT_SHA}." >&2
+            exit 1
+          }
 
       - name: Create or recover draft release
         run: |
           set -euo pipefail
-          ASSETS=(release-artifact/prime-linc.tgz release-artifact/SHA256SUMS)
+          ASSETS=(release-artifact/prime-linc.tgz release-artifact/release.json release-artifact/SHA256SUMS)
           RELEASE_KIND=()
           if [[ "${RELEASE_TAG}" == *-* ]]; then
             RELEASE_KIND+=(--prerelease)
@@ -167,7 +229,7 @@ jobs:
           REMOTE_DIR="$(mktemp -d)"
           trap 'rm -rf "${REMOTE_DIR}"' EXIT
 
-          for ASSET in prime-linc.tgz SHA256SUMS; do
+          for ASSET in prime-linc.tgz release.json SHA256SUMS; do
             if gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "${ASSET}" --dir "${REMOTE_DIR}"; then
               cmp "release-artifact/${ASSET}" "${REMOTE_DIR}/${ASSET}" || {
                 echo "Existing ${RELEASE_TAG} asset ${ASSET} has different bytes." >&2
@@ -206,4 +268,6 @@ jobs:
           trap 'rm -rf "${VERIFY_DIR}"' EXIT
           gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --dir "${VERIFY_DIR}"
           cmp release-artifact/prime-linc.tgz "${VERIFY_DIR}/prime-linc.tgz"
+          cmp release-artifact/release.json "${VERIFY_DIR}/release.json"
           cmp release-artifact/SHA256SUMS "${VERIFY_DIR}/SHA256SUMS"
+          gh release verify-asset "${RELEASE_TAG}" release-artifact/prime-linc.tgz --repo "${GITHUB_REPOSITORY}"

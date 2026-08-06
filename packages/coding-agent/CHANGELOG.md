@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Changed built-in Case.dev workflows to use the `casedev` CLI through IPython instead of static model-facing tools.
+
 ## [0.7.0] - 2026-08-05
 
 ### Breaking Changes

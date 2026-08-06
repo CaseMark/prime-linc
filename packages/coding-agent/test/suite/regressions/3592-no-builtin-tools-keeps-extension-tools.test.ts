@@ -112,19 +112,29 @@ describe("regression #3592: no-builtin-tools keeps extension tools enabled", () 
 			noTools: "builtin",
 		});
 
-		expect(session.getActiveToolNames().sort()).toEqual(
-			[
-				"legal_research",
-				"skill_read",
-				"skill_search",
-				"vault_download",
-				"vault_list",
-				"vault_search",
-				"vault_upload",
-				"web_search",
-			].sort(),
-		);
+		expect(session.getAllTools().map((tool) => tool.name)).toEqual(["ipython"]);
+		expect(session.getActiveToolNames()).toEqual([]);
 		expect(session.systemPrompt).not.toContain("- ipython:");
+		session.dispose();
+	});
+
+	it("keeps IPython as the only default tool in service-based sessions", async () => {
+		const settingsManager = SettingsManager.create(tempDir, agentDir);
+		const sessionManager = SessionManager.inMemory(tempDir);
+		const services = await createAgentSessionServices({
+			cwd: tempDir,
+			agentDir,
+			settingsManager,
+		});
+
+		const { session } = await createAgentSessionFromServices({
+			services,
+			sessionManager,
+			model: getModel("anthropic", "claude-sonnet-4-5")!,
+		});
+
+		expect(session.getAllTools().map((tool) => tool.name)).toEqual(["ipython"]);
+		expect(session.getActiveToolNames()).toEqual(["ipython"]);
 		session.dispose();
 	});
 });

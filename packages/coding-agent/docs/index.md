@@ -7,7 +7,7 @@ prime-linc is an RLM-native coding and research harness built around a persisten
 Install the latest stable release with Node.js 22.8 or newer:
 
 ```bash
-npm install -g @casemark/prime-linc
+npm install -g https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 ```
 
 Then run it in a project directory:
@@ -19,7 +19,7 @@ prime-linc
 
 Authenticate with `/login` for subscription or stored API-key providers, or set an environment variable such as `ANTHROPIC_API_KEY` before launch. See the [Quickstart](quickstart.md) for the complete first-run flow.
 
-The public CLI and SDK package is `@casemark/prime-linc`. The inherited npm workspace names in the source tree are implementation details, not public install paths.
+The public CLI and SDK ship as the `@casemark/prime-linc` tarball on GitHub Releases. The inherited npm workspace names in the source tree are implementation details, not public install paths.
 
 ## Start Here
 

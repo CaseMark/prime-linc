@@ -7,10 +7,10 @@ This page gets you from install to a useful first prime-linc session.
 Install the latest stable release with Node.js 22.8 or newer:
 
 ```bash
-npm install -g @casemark/prime-linc
+npm install -g https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 ```
 
-This installs the canonical `prime-linc` command plus the compatible `linc` and `pi` aliases. The inherited workspace identifiers in the source tree are not public install paths.
+This installs the npm-compatible tarball from the latest immutable GitHub Release, including the canonical `prime-linc` command and compatible `linc` and `pi` aliases. The inherited workspace identifiers in the source tree are not public install paths.
 
 Then start prime-linc in the project directory you want it to work on:
 

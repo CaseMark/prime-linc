@@ -1,9 +1,9 @@
 name: Release Prime Agent (legacy R2 binaries)
 
 # Legacy R2 tarball installer pipeline. It requires R2_* secrets that are not
-# configured on the CaseMark repo, so automated runs are disabled. The npm
-# publish pipeline (scripts/publish.mjs + npm-publish.yml) is the release
-# mechanism now; keep this only for manual R2 artifact builds.
+# configured on the CaseMark repo, so automated runs are disabled. The GitHub Release
+# pipeline (scripts/publish.mjs + github-release.yml) is the release mechanism
+# now; keep this only for manual R2 artifact builds.
 on:
   workflow_dispatch:
     inputs:

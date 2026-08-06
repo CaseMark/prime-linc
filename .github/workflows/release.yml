@@ -1,4 +1,4 @@
-name: Release npm package
+name: Release prime-linc
 
 on:
   workflow_dispatch:
@@ -6,12 +6,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: release-npm
+  group: release-prime-linc
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Tag reviewed main and start publisher
+    name: Tag reviewed main and start release
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -45,13 +45,12 @@ jobs:
           git push origin "${TAG}"
 
       # Pushes made with GITHUB_TOKEN intentionally do not trigger push
-      # workflows. Dispatch npm-publish.yml explicitly so npm sees one stable
-      # trusted-publisher workflow identity for manual, tag, and normal releases.
-      - name: Start isolated publisher
+      # workflows. Dispatch github-release.yml explicitly from reviewed main.
+      - name: Start isolated release publisher
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
-        run: gh workflow run npm-publish.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
+        run: gh workflow run github-release.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
 
       - name: Summary
         env:
@@ -61,6 +60,6 @@ jobs:
             echo "## Release started"
             echo
             echo "- Tagged reviewed main as ${TAG}."
-            echo "- Dispatched the isolated npm Publish workflow."
-            echo "- Publishing waits at the npm-publish environment gate."
+            echo "- Dispatched the isolated GitHub Release workflow."
+            echo "- Publication waits at the github-release environment gate."
           } >> "${GITHUB_STEP_SUMMARY}"

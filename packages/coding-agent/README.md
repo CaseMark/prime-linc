@@ -4,7 +4,7 @@
   RLM-native terminal coding and research harness.
 </p>
 
-prime-linc began as a hard fork of [pi-mono](https://github.com/badlogic/pi-mono), but it is now developed and distributed independently by CaseMark. The source workspace retains inherited `@earendil-works/pi-*` identifiers for compatibility; the public package and SDK are `@casemark/prime-linc`.
+prime-linc began as a hard fork of [pi-mono](https://github.com/badlogic/pi-mono), but it is now developed and distributed independently by CaseMark. The source workspace retains inherited `@earendil-works/pi-*` identifiers for compatibility; GitHub Releases provide the standalone CLI and SDK package named `@casemark/prime-linc`.
 
 ## Table of Contents
 
@@ -36,7 +36,7 @@ prime-linc began as a hard fork of [pi-mono](https://github.com/badlogic/pi-mono
 Requires Node.js 22.8 or newer:
 
 ```bash
-npm install -g @casemark/prime-linc
+npm install -g https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 prime-linc
 ```
 
@@ -433,7 +433,7 @@ See [docs/packages.md](docs/packages.md).
 ### SDK
 
 ```bash
-npm install @casemark/prime-linc
+npm install https://github.com/CaseMark/prime-linc/releases/latest/download/prime-linc.tgz
 ```
 
 ```typescript

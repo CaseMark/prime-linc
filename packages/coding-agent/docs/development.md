@@ -24,7 +24,7 @@ The script can be called from any directory and preserves the caller's working d
 
 prime-linc is the product, public CLI, release artifact, and repository name. The monorepo still retains inherited `@earendil-works/pi-*` npm workspace names, a source-package `pi` bin entry, the `pi` package manifest key, and some `PI_*` compatibility environment variables. These names are source and compatibility details, not a signal that contributors should install or develop against pi-mono.
 
-Public releases are the standalone `@casemark/prime-linc` npm package. `scripts/publish.mjs` stages and smoke-tests the package while bundling the customized workspaces; do not document inherited workspace package names as public install paths.
+Public releases are standalone npm-compatible `@casemark/prime-linc` tarballs attached to immutable GitHub Releases. `scripts/publish.mjs` stages and smoke-tests the artifact while bundling the customized workspaces; do not document inherited workspace package names as public install paths.
 
 ## Local Configuration
 

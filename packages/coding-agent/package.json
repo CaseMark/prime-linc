@@ -1,6 +1,6 @@
 {
 	"name": "@earendil-works/pi-coding-agent",
-	"version": "0.7.0",
+	"version": "0.7.1",
 	"description": "case.dev-native RLM agent harness (prime-linc)",
 	"type": "module",
 	"piConfig": {
@@ -49,9 +49,9 @@
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "^1.3.0",
-		"@earendil-works/pi-agent-core": "^0.7.0",
-		"@earendil-works/pi-ai": "^0.7.0",
-		"@earendil-works/pi-tui": "^0.7.0",
+		"@earendil-works/pi-agent-core": "^0.7.1",
+		"@earendil-works/pi-ai": "^0.7.1",
+		"@earendil-works/pi-tui": "^0.7.1",
 		"@silvia-odwyer/photon-node": "^0.3.4",
 		"chalk": "^5.5.0",
 		"cli-highlight": "^2.1.11",

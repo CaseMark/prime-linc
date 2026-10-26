@@ -87,8 +87,17 @@ jobs:
           python3 -m pip install --user uv
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
+      # Same commands as CI: test:ci bootstraps the kernel, and the process
+      # and kernel suites run apart from the rest, as they do there.
       - name: Test
-        run: npm test
+        run: |
+          npm test --workspace packages/agent
+          npm test --workspace packages/ai
+          npm test --workspace packages/tui
+          cd packages/coding-agent
+          npm run test:ci
+          npm run test:process
+          npm run test:kernel
 
       - name: Verify build did not mutate source
         run: git diff --exit-code

@@ -31,6 +31,8 @@ import type { AssistantMessage } from "../types.js";
 const OVERFLOW_PATTERNS = [
 	/prompt is too long/i, // Anthropic token overflow
 	/request_too_large/i, // Anthropic request byte-size overflow (HTTP 413)
+	/(?:^|\b(?:http(?:\/\d(?:\.\d)?)?|status(?: code)?|error)[:=\s"']+)413\b/i, // SDK/proxy HTTP status
+	/\b(?:request entity|payload|content) too large\b/i, // HTTP 413 reason phrases
 	/input is too long for requested model/i, // Amazon Bedrock
 	/exceeds the context window/i, // OpenAI (Completions & Responses API)
 	/input token count.*exceeds the maximum/i, // Google (Gemini)

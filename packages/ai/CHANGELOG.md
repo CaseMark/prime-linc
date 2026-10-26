@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fixed generic HTTP 413 and oversized-request errors bypassing automatic context compaction and retry.
+
 ## [0.7.0] - 2026-08-05
 
 ## [0.6.1] - 2026-08-05

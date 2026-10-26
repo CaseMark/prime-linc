@@ -30,6 +30,36 @@ function createErrorMessage(errorMessage: string): AssistantMessage {
 }
 
 describe("isContextOverflow", () => {
+	it.each([
+		"413",
+		"413 Request Entity Too Large",
+		"413 <html><title>Request Entity Too Large</title></html>",
+		"HTTP 413",
+		"HTTP/1.1 413 unknown response",
+		"Request failed with status code 413",
+		'Error: {"status":413,"message":"rejected"}',
+		"API error: 413",
+		"Payload Too Large",
+		"Content Too Large",
+		"request entity too large",
+	])("detects oversized request errors: %s", (error) => {
+		expect(isContextOverflow(createErrorMessage(error))).toBe(true);
+	});
+
+	it.each([
+		"500 Internal Server Error",
+		"401 Unauthorized",
+		"429 Too Many Requests",
+		"Invalid input: 413 tokens",
+		"HTTP 4130",
+	])("does not confuse other errors with HTTP 413: %s", (error) => {
+		expect(isContextOverflow(createErrorMessage(error))).toBe(false);
+	});
+
+	it("does not treat successful text mentioning 413 as an error", () => {
+		expect(isContextOverflow({ ...createErrorMessage("413"), stopReason: "stop" })).toBe(false);
+	});
+
 	it("detects explicit Ollama prompt-too-long errors", () => {
 		const message = createErrorMessage("400 `prompt too long; exceeded max context length by 100918 tokens`");
 		expect(isContextOverflow(message, 32768)).toBe(true);

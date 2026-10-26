@@ -533,44 +533,48 @@ describe("AgentSession compaction characterization", () => {
 		expect(harness.session.agent.convertToLlm([outcome!])).toEqual([]);
 	});
 
-	it("does not retry overflow recovery more than once", async () => {
-		const harness = await createHarness();
-		harnesses.push(harness);
-		const sessionInternals = harness.session as unknown as SessionWithCompactionInternals;
-		const overflowMessage = createAssistant(harness, {
-			stopReason: "error",
-			errorMessage: "prompt is too long",
-			timestamp: Date.now(),
-		});
-		const runAutoCompactionSpy = vi.spyOn(sessionInternals, "_runAutoCompaction").mockResolvedValue();
-		const compactionErrors: string[] = [];
-		harness.session.subscribe((event) => {
-			if (event.type === "compaction_end" && event.errorMessage) {
-				compactionErrors.push(event.errorMessage);
-			}
-		});
+	it.each(["prompt is too long", "413 Request Entity Too Large", "413"])(
+		"compacts and retries only once for %s",
+		async (errorMessage) => {
+			const harness = await createHarness();
+			harnesses.push(harness);
+			const sessionInternals = harness.session as unknown as SessionWithCompactionInternals;
+			const overflowMessage = createAssistant(harness, {
+				stopReason: "error",
+				errorMessage,
+				timestamp: Date.now(),
+			});
+			const runAutoCompactionSpy = vi.spyOn(sessionInternals, "_runAutoCompaction").mockResolvedValue();
+			const compactionErrors: string[] = [];
+			harness.session.subscribe((event) => {
+				if (event.type === "compaction_end" && event.errorMessage) {
+					compactionErrors.push(event.errorMessage);
+				}
+			});
 
-		await sessionInternals._checkCompaction(overflowMessage);
-		await sessionInternals._checkCompaction({ ...overflowMessage, timestamp: Date.now() + 1 });
-		await sessionInternals._checkCompaction({ ...overflowMessage, timestamp: Date.now() + 2 });
+			await sessionInternals._checkCompaction(overflowMessage);
+			await sessionInternals._checkCompaction({ ...overflowMessage, timestamp: Date.now() + 1 });
+			await sessionInternals._checkCompaction({ ...overflowMessage, timestamp: Date.now() + 2 });
 
-		expect(runAutoCompactionSpy).toHaveBeenCalledTimes(1);
-		const message =
-			"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.";
-		expect(compactionErrors).toContain(message);
-		expect(harness.session.messages.at(-1)).toMatchObject({
-			role: "custom",
-			customType: "compaction_outcome",
-			content: message,
-			details: { reason: "overflow", outcome: "failed" },
-		});
-		expect(
-			harness.session.messages.filter(
-				(entry) =>
-					entry.role === "custom" && entry.customType === "compaction_outcome" && entry.content === message,
-			),
-		).toHaveLength(1);
-	});
+			expect(runAutoCompactionSpy).toHaveBeenCalledTimes(1);
+			expect(runAutoCompactionSpy).toHaveBeenCalledWith("overflow", true);
+			const message =
+				"Context overflow recovery failed after one compact-and-retry attempt. Try reducing context or switching to a larger-context model.";
+			expect(compactionErrors).toContain(message);
+			expect(harness.session.messages.at(-1)).toMatchObject({
+				role: "custom",
+				customType: "compaction_outcome",
+				content: message,
+				details: { reason: "overflow", outcome: "failed" },
+			});
+			expect(
+				harness.session.messages.filter(
+					(entry) =>
+						entry.role === "custom" && entry.customType === "compaction_outcome" && entry.content === message,
+				),
+			).toHaveLength(1);
+		},
+	);
 
 	it("ignores stale pre-compaction assistant usage on pre-prompt checks", async () => {
 		const harness = await createHarness();

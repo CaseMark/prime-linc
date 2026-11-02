@@ -31,6 +31,9 @@ const IOPUB_SUBSCRIBE_DELAY_MS = 50;
 const DEFAULT_MAX_OUTPUT_CHARS = 65536;
 const HOST_REQUEST_DISPOSE_TIMEOUT_MS = 5000;
 const DEFAULT_SNAPSHOT_DEBOUNCE_MS = 1500;
+// An auto-snapshot blocks the kernel while it serializes the namespace; space
+// them so they take at most ~1/N of wall time once the namespace grows large.
+const SNAPSHOT_COOLDOWN_FACTOR = 10;
 // How often to poll a forked kernel's pid for unexpected death.
 const FORKED_LIVENESS_POLL_MS = 1000;
 // Snapshot/restore cells can be large to (de)serialize; give them room beyond the user cap.
@@ -49,6 +52,36 @@ export class KernelBusyAfterInterruptError extends Error {
 	constructor() {
 		super(KERNEL_BUSY_AFTER_INTERRUPT_MESSAGE);
 		this.name = "KernelBusyAfterInterruptError";
+	}
+}
+
+/** The kernel process died on its own (crash, OOM kill), not through shutdown/dispose/kill. */
+export class KernelExitedUnexpectedlyError extends Error {
+	constructor(readonly reason: string) {
+		super(`IPython kernel exited unexpectedly (${describeKernelExit(reason)})`);
+		this.name = "KernelExitedUnexpectedlyError";
+	}
+}
+
+/** Human-readable exit reason; SIGKILL from outside is almost always the OOM killer. */
+export function describeKernelExit(reason: string): string {
+	if (/\boom_kill\b/.test(reason)) {
+		return `${reason}; the machine ran out of memory and the kernel was killed`;
+	}
+	return /signal=SIGKILL\b/.test(reason)
+		? `${reason}; the process was killed, most likely because the machine ran out of memory`
+		: reason;
+}
+
+const CGROUP_MEMORY_EVENTS = "/sys/fs/cgroup/memory.events";
+
+/** cgroup v2 OOM-kill counter for this process's cgroup, or undefined where unavailable. */
+function readCgroupOomKills(): number | undefined {
+	try {
+		const match = /^oom_kill (\d+)$/m.exec(readFileSync(CGROUP_MEMORY_EVENTS, "utf8"));
+		return match ? Number(match[1]) : undefined;
+	} catch {
+		return undefined;
 	}
 }
 
@@ -545,6 +578,12 @@ export class KernelManager {
 	private startPromise?: Promise<void>;
 	/** Pending debounced auto-snapshot, if one has been scheduled. */
 	private snapshotTimer?: ReturnType<typeof globalThis.setTimeout>;
+	private lastSnapshotDurationMs = 0;
+	private lastSnapshotFinishedAt = 0;
+	/** Set when the kernel process died without us shutting it down. */
+	private exitReason?: string;
+	/** cgroup OOM-kill count when the kernel became ready; a forked kernel's exit signal is not observable. */
+	private oomKillsAtStart?: number;
 
 	constructor(options: KernelManagerOptions) {
 		this.options = {
@@ -563,8 +602,26 @@ export class KernelManager {
 		return this.options.sessionId;
 	}
 
+	/** Why the kernel process died on its own, or undefined if it is alive or was shut down deliberately. */
+	get unexpectedExit(): string | undefined {
+		return this.exitReason;
+	}
+
 	private appendKernelDiagnostic(message: string): void {
 		this.kernelStderr += `[kernel] ${message.endsWith("\n") ? message : `${message}\n`}`;
+	}
+
+	private markUnexpectedExit(reason: string): void {
+		const oomKills = readCgroupOomKills();
+		const oomKilled = this.oomKillsAtStart !== undefined && oomKills !== undefined && oomKills > this.oomKillsAtStart;
+		this.exitReason = oomKilled ? `${reason}, oom_kill` : reason;
+		this.appendKernelDiagnostic(`unexpected exit: ${this.exitReason}`);
+	}
+
+	private shutdownError(): Error {
+		return this.exitReason !== undefined
+			? new KernelExitedUnexpectedlyError(this.exitReason)
+			: new Error("Kernel has been shut down");
 	}
 
 	async start(options: KernelStartOptions = {}): Promise<void> {
@@ -667,7 +724,7 @@ export class KernelManager {
 			kernel.on("exit", (code, signal) => {
 				if (this.kernel !== kernel) return;
 				if (this.state !== "shutdown") {
-					this.appendKernelDiagnostic(`unexpected exit code=${code} signal=${signal}`);
+					this.markUnexpectedExit(`code=${code} signal=${signal}`);
 				}
 				this.state = "shutdown";
 				liveKernels.delete(this);
@@ -709,6 +766,7 @@ export class KernelManager {
 		}
 
 		this.state = "running";
+		this.oomKillsAtStart = readCgroupOomKills();
 		this.startForkedLivenessMonitor();
 	}
 
@@ -720,7 +778,7 @@ export class KernelManager {
 		this.forkedLivenessTimer = globalThis.setInterval(() => {
 			if (this.state !== "running") return;
 			if (!this.forkedKernelDied()) return;
-			this.appendKernelDiagnostic("forked kernel exited unexpectedly");
+			this.markUnexpectedExit("forked kernel process is gone");
 			this.state = "shutdown";
 			liveKernels.delete(this);
 			this.cleanupResources();
@@ -817,7 +875,7 @@ export class KernelManager {
 		}
 		await this.start({ signal: opts.signal });
 		if ((this.state as string) === "shutdown") {
-			throw new Error("Kernel has been shut down");
+			throw this.shutdownError();
 		}
 
 		const prev = this.executionQueue;
@@ -834,7 +892,7 @@ export class KernelManager {
 				return { stdout: "", stderr: "", status: "aborted", durationMs: Date.now() - started };
 			}
 			if ((this.state as string) === "shutdown") {
-				throw new Error("Kernel has been shut down");
+				throw this.shutdownError();
 			}
 			return await this.executeInner(code, opts, started);
 		} finally {
@@ -1169,7 +1227,7 @@ export class KernelManager {
 		const started = Date.now();
 		while (this.activeExecution && Date.now() - started < KERNEL_BUSY_REUSE_WAIT_MS) {
 			if ((this.state as string) === "shutdown") {
-				throw new Error("Kernel has been shut down");
+				throw this.shutdownError();
 			}
 			void this.interrupt().catch(() => undefined);
 			const remaining = KERNEL_BUSY_REUSE_WAIT_MS - (Date.now() - started);
@@ -1292,7 +1350,7 @@ export class KernelManager {
 			globalThis.clearInterval(this.forkedLivenessTimer);
 			this.forkedLivenessTimer = undefined;
 		}
-		this.rejectActiveExecution(new Error("Kernel has been shut down"));
+		this.rejectActiveExecution(this.shutdownError());
 		this.shell?.close();
 		this.iopub?.close();
 		this.control?.close();
@@ -1408,6 +1466,8 @@ export class KernelManager {
 		const code = buildSnapshotCode(cfg.path, cfg.manifestPath, cfg.maxBytes ?? DEFAULT_SNAPSHOT_MAX_BYTES);
 		try {
 			const r = await this.enqueueExecute(code, { maxOutputChars: SNAPSHOT_MAX_OUTPUT_CHARS, internal: true });
+			this.lastSnapshotDurationMs = r.durationMs;
+			this.lastSnapshotFinishedAt = Date.now();
 			if (r.status !== "ok") {
 				this.appendKernelDiagnostic(`state snapshot failed: ${r.error?.evalue ?? r.stderr}`);
 				return null;
@@ -1465,10 +1525,12 @@ export class KernelManager {
 		const cfg = this.options.snapshot;
 		if (!cfg) return;
 		if (this.snapshotTimer) clearTimeout(this.snapshotTimer);
+		const cooldownUntil = this.lastSnapshotFinishedAt + this.lastSnapshotDurationMs * SNAPSHOT_COOLDOWN_FACTOR;
+		const delayMs = Math.max(cfg.debounceMs ?? DEFAULT_SNAPSHOT_DEBOUNCE_MS, cooldownUntil - Date.now());
 		this.snapshotTimer = globalThis.setTimeout(() => {
 			this.snapshotTimer = undefined;
 			void this.snapshotState();
-		}, cfg.debounceMs ?? DEFAULT_SNAPSHOT_DEBOUNCE_MS);
+		}, delayMs);
 		if (this.snapshotTimer && typeof this.snapshotTimer === "object" && "unref" in this.snapshotTimer) {
 			this.snapshotTimer.unref();
 		}

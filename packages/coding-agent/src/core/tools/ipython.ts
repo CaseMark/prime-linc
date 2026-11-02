@@ -8,11 +8,13 @@ import type { ExtensionContext, ToolDefinition } from "../extensions/types.js";
 import { withKernelBootPermit } from "../kernel/boot-gate.js";
 import type { KernelBootstrapProgressHandler } from "../kernel/bootstrap.js";
 import {
+	describeKernelExit,
 	type ExecuteResult,
 	type HostRequestHandlers,
 	type KernelAttachment,
 	KernelBusyAfterInterruptError,
 	type KernelDiffDisplay,
+	KernelExitedUnexpectedlyError,
 	KernelManager,
 	type KernelSentAgentMessage,
 } from "../kernel/index.js";
@@ -159,6 +161,43 @@ const KERNEL_RESTART_NOTICE = [
 	"The IPython kernel was restarted after a previous interrupted cell kept running. Variables, imports, async tasks, and open resources from before the restart are no longer available; recreate them before using them.",
 	"</ipython_kernel_reset>",
 ].join("\n");
+/** Restarts after the kernel died on its own, per session. Bounds a crash loop. */
+const MAX_KERNEL_CRASH_RESTARTS = 3;
+
+/** A kernel that died on its own and was replaced on the next ensure(). */
+export interface KernelCrashRecovery {
+	reason: string;
+	/** What the replacement revived from the last snapshot, if snapshots are enabled. */
+	restore?: RestoreResult;
+}
+
+function kernelCrashRecoveryNotice(recovery: KernelCrashRecovery): string {
+	const lines = [
+		"<ipython_kernel_reset>",
+		`The IPython kernel exited unexpectedly (${describeKernelExit(recovery.reason)}) and was restarted.`,
+	];
+	if (recovery.restore && recovery.restore.restored.length > 0) {
+		lines.push(
+			`Restored from the last saved state: ${recovery.restore.restored.join(", ")}. Changes made after that save are lost.`,
+		);
+	} else {
+		lines.push("No saved variables were restored; recreate the variables, imports, and data you need.");
+	}
+	if (recovery.restore && recovery.restore.failed.length > 0) {
+		lines.push(`Could not be restored: ${recovery.restore.failed.map((f) => f.name).join(", ")}.`);
+	}
+	lines.push(
+		"Processes started outside the kernel (subprocesses, background jobs) may still be running or may have finished; check their output files before starting them again.",
+		"</ipython_kernel_reset>",
+	);
+	return lines.join("\n");
+}
+
+function kernelCrashErrorText(error: KernelExitedUnexpectedlyError, willRestart: boolean): string {
+	return willRestart
+		? `${error.message}. The next ipython call starts a new kernel and restores the last saved variables.`
+		: `${error.message}. It has been restarted ${MAX_KERNEL_CRASH_RESTARTS} times in this session and will not be restarted again.`;
+}
 
 function createAbortError(): Error {
 	return new Error("IPython execution aborted");
@@ -333,6 +372,10 @@ export class IpythonKernelProvisioner {
 	private lastStartupMessage?: string;
 	private _lastRestore?: RestoreResult;
 	private readonly disposeController = new AbortController();
+	private crashRestarts = 0;
+	private pendingCrashRecovery?: KernelCrashRecovery;
+	/** Crash reason carried over when the replacement kernel failed to start. */
+	private failedCrashRestart?: string;
 
 	constructor(
 		private readonly cwd: string,
@@ -361,6 +404,18 @@ export class IpythonKernelProvisioner {
 	/** Whether a kernel has finished starting and is currently running. */
 	get hasRunningKernel(): boolean {
 		return this.startedManager?.isRunning ?? false;
+	}
+
+	/** Whether the next ensure() may replace a kernel that died on its own. */
+	get canRestartAfterCrash(): boolean {
+		return this.crashRestarts < MAX_KERNEL_CRASH_RESTARTS;
+	}
+
+	/** The crash the last ensure() recovered from, once; undefined if none is pending. */
+	takeCrashRecovery(): KernelCrashRecovery | undefined {
+		const recovery = this.pendingCrashRecovery;
+		this.pendingCrashRecovery = undefined;
+		return recovery;
 	}
 
 	/** Live user-defined names in the kernel namespace, or null if listing failed / no kernel. */
@@ -410,6 +465,27 @@ export class IpythonKernelProvisioner {
 		if (signal?.aborted) {
 			return Promise.reject(createAbortError());
 		}
+		// A kernel that died on its own stays in `shutdown` forever; replace it
+		// (reviving the last snapshot) instead of failing every later call. A
+		// replacement that dies while starting (e.g. restoring the snapshot that
+		// ran it out of memory) counts against the same cap.
+		const crashReason =
+			this.startedManager?.unexpectedExit ?? (this.managerPromise ? undefined : this.failedCrashRestart);
+		let restartAfterCrash: string | undefined;
+		if (crashReason !== undefined) {
+			if (this.canRestartAfterCrash) {
+				this.crashRestarts++;
+				restartAfterCrash = crashReason;
+				this.failedCrashRestart = undefined;
+				this.managerPromise = undefined;
+				this.startedManager = undefined;
+				if (this.options?.kernelManagerRef) {
+					this.options.kernelManagerRef.current = undefined;
+				}
+			} else if (!this.startedManager) {
+				return Promise.reject(new KernelExitedUnexpectedlyError(crashReason));
+			}
+		}
 		let cleanupProgressListener: (() => void) | undefined;
 		if (onProgress && !this.startedManager) {
 			this.startupListeners.add(onProgress);
@@ -424,7 +500,7 @@ export class IpythonKernelProvisioner {
 			}
 		}
 		if (!this.managerPromise) {
-			const startup = this.startKernel(signal);
+			const startup = this.startKernel(signal, restartAfterCrash);
 			this.managerPromise = startup;
 			startup.then(
 				(m) => {
@@ -438,6 +514,9 @@ export class IpythonKernelProvisioner {
 					// rethrowing a cached rejection forever.
 					if (this.managerPromise === startup) {
 						this.managerPromise = undefined;
+						if (restartAfterCrash !== undefined && !signal?.aborted) {
+							this.failedCrashRestart = restartAfterCrash;
+						}
 					}
 					this.settleStartup();
 				},
@@ -460,7 +539,7 @@ export class IpythonKernelProvisioner {
 		}
 	}
 
-	private async startKernel(signal?: AbortSignal): Promise<KernelManager> {
+	private async startKernel(signal?: AbortSignal, crashReason?: string): Promise<KernelManager> {
 		const startupAbort = createLinkedAbortSignal([this.disposeController.signal, signal]);
 		const startupSignal = startupAbort.signal;
 		// Wait for a previous provisioner (e.g. on /reload) to finish disposing — and
@@ -532,6 +611,11 @@ export class IpythonKernelProvisioner {
 			// a notice claiming restored state must never outlive a failed bootstrap.
 			if (pendingRestore) {
 				this._lastRestore = pendingRestore;
+			}
+			if (crashReason !== undefined) {
+				// Reported on the tool result that triggered the restart, not as a resumed-session notice.
+				this.pendingCrashRecovery = { reason: crashReason, restore: pendingRestore };
+			} else if (pendingRestore) {
 				this.options?.onRestore?.(pendingRestore);
 			}
 			if (this.options?.kernelManagerRef) {
@@ -573,10 +657,12 @@ async function executeWithBusyKernelChoice(
 	onWorkingMessage: (message?: string) => void,
 	onLateSentAgentMessage: ((toolCallId: string, message: KernelSentAgentMessage) => void) | undefined,
 	ctx: ExtensionContext | undefined,
-): Promise<{ result: ExecuteResult; kernelRestarted: boolean }> {
+): Promise<{ result: ExecuteResult; kernelRestarted: boolean; crashRecovery?: KernelCrashRecovery }> {
 	let kernelRestarted = false;
+	let crashRecovery: KernelCrashRecovery | undefined;
 	while (true) {
 		const m = await provisioner.ensure(reportStartupProgress, signal);
+		crashRecovery = provisioner.takeCrashRecovery?.() ?? crashRecovery;
 		try {
 			return {
 				result: await m.execute(code, {
@@ -586,7 +672,8 @@ async function executeWithBusyKernelChoice(
 						? (message) => onLateSentAgentMessage(toolCallId, message)
 						: undefined,
 				}),
-				kernelRestarted,
+				kernelRestarted: kernelRestarted || crashRecovery !== undefined,
+				crashRecovery,
 			};
 		} catch (error) {
 			if (!(error instanceof KernelBusyAfterInterruptError) || signal?.aborted) {
@@ -647,22 +734,29 @@ export function createIpythonToolDefinition(
 
 			try {
 				const code = applyShellSettingsToBashMagicCell(params.code, options);
-				const { result: r, kernelRestarted } = await executeWithBusyKernelChoice(
-					provisioner,
-					reportStartupProgress,
-					toolCallId,
-					code,
-					signal,
-					(chunk) => {
-						onUpdate?.({
-							content: [{ type: "text", text: chunk }],
-							details: { status: "ok" },
-						});
-					},
-					setToolWorkingMessage,
-					options?.onLateSentAgentMessage,
-					ctx,
-				);
+				let execution: Awaited<ReturnType<typeof executeWithBusyKernelChoice>>;
+				try {
+					execution = await executeWithBusyKernelChoice(
+						provisioner,
+						reportStartupProgress,
+						toolCallId,
+						code,
+						signal,
+						(chunk) => {
+							onUpdate?.({
+								content: [{ type: "text", text: chunk }],
+								details: { status: "ok" },
+							});
+						},
+						setToolWorkingMessage,
+						options?.onLateSentAgentMessage,
+						ctx,
+					);
+				} catch (error) {
+					if (!(error instanceof KernelExitedUnexpectedlyError)) throw error;
+					throw new Error(kernelCrashErrorText(error, provisioner.canRestartAfterCrash));
+				}
+				const { result: r, kernelRestarted, crashRecovery } = execution;
 
 				let text = r.stdout;
 				if (r.stderr) text += (text ? "\n" : "") + r.stderr;
@@ -671,7 +765,8 @@ export function createIpythonToolDefinition(
 					text += (text ? "\n" : "") + r.error.traceback.join("\n");
 				}
 				if (kernelRestarted) {
-					text = text ? `${KERNEL_RESTART_NOTICE}\n\n${text}` : KERNEL_RESTART_NOTICE;
+					const notice = crashRecovery ? kernelCrashRecoveryNotice(crashRecovery) : KERNEL_RESTART_NOTICE;
+					text = text ? `${notice}\n\n${text}` : notice;
 				}
 
 				const imageBlocks = imageBlocksFromAttachments(r.attachments);

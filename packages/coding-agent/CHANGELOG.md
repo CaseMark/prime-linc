@@ -5,6 +5,8 @@
 ### Changed
 
 - Changed built-in Case.dev workflows to use the `casedev` CLI through IPython instead of static model-facing tools.
+- Fixed IPython failing every call for the rest of a session after its kernel process died (for example, killed when out of memory); the next call now starts a new kernel, restores the last saved variables, and tells the model why.
+- Changed IPython auto-snapshots to back off after a slow save, so a large namespace no longer blocks the kernel after every cell.
 
 ## [0.7.0] - 2026-08-05
 

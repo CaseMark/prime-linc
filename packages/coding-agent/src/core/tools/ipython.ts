@@ -374,6 +374,8 @@ export class IpythonKernelProvisioner {
 	private readonly disposeController = new AbortController();
 	private crashRestarts = 0;
 	private pendingCrashRecovery?: KernelCrashRecovery;
+	/** Crash reason carried over when the replacement kernel failed to start. */
+	private failedCrashRestart?: string;
 
 	constructor(
 		private readonly cwd: string,
@@ -464,16 +466,24 @@ export class IpythonKernelProvisioner {
 			return Promise.reject(createAbortError());
 		}
 		// A kernel that died on its own stays in `shutdown` forever; replace it
-		// (reviving the last snapshot) instead of failing every later call.
-		const crashReason = this.startedManager?.unexpectedExit;
+		// (reviving the last snapshot) instead of failing every later call. A
+		// replacement that dies while starting (e.g. restoring the snapshot that
+		// ran it out of memory) counts against the same cap.
+		const crashReason =
+			this.startedManager?.unexpectedExit ?? (this.managerPromise ? undefined : this.failedCrashRestart);
 		let restartAfterCrash: string | undefined;
-		if (crashReason !== undefined && this.canRestartAfterCrash) {
-			this.crashRestarts++;
-			restartAfterCrash = crashReason;
-			this.managerPromise = undefined;
-			this.startedManager = undefined;
-			if (this.options?.kernelManagerRef) {
-				this.options.kernelManagerRef.current = undefined;
+		if (crashReason !== undefined) {
+			if (this.canRestartAfterCrash) {
+				this.crashRestarts++;
+				restartAfterCrash = crashReason;
+				this.failedCrashRestart = undefined;
+				this.managerPromise = undefined;
+				this.startedManager = undefined;
+				if (this.options?.kernelManagerRef) {
+					this.options.kernelManagerRef.current = undefined;
+				}
+			} else if (!this.startedManager) {
+				return Promise.reject(new KernelExitedUnexpectedlyError(crashReason));
 			}
 		}
 		let cleanupProgressListener: (() => void) | undefined;
@@ -504,6 +514,9 @@ export class IpythonKernelProvisioner {
 					// rethrowing a cached rejection forever.
 					if (this.managerPromise === startup) {
 						this.managerPromise = undefined;
+						if (restartAfterCrash !== undefined && !signal?.aborted) {
+							this.failedCrashRestart = restartAfterCrash;
+						}
 					}
 					this.settleStartup();
 				},

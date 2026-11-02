@@ -1,10 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ExtensionContext } from "../src/core/extensions/types.js";
-import { describeKernelExit, KernelManager } from "../src/core/kernel/index.js";
+import { describeKernelExit, KernelExitedUnexpectedlyError, KernelManager } from "../src/core/kernel/index.js";
 import { snapshotPathIn } from "../src/core/kernel/state-snapshot.js";
 import { createIpythonToolDefinition, IpythonKernelProvisioner } from "../src/core/tools/ipython.js";
 
@@ -125,6 +125,49 @@ describeIfKernel("ipython kernel crash restart (real kernel)", () => {
 		}
 		await expect(run("print(1)")).rejects.toThrow("will not be restarted again");
 	}, 120_000);
+});
+
+describe("crash restart cap when the replacement fails to start", () => {
+	let dir = "";
+
+	beforeEach(() => {
+		dir = mkdtempSync(join(tmpdir(), "prime-linc-crash-startup-"));
+	});
+
+	afterEach(() => {
+		if (dir) rmSync(dir, { recursive: true, force: true });
+	});
+
+	it("counts each failed replacement against the cap, then stops spawning", async () => {
+		const python = join(dir, "python");
+		const runs = join(dir, "runs");
+		writeFileSync(python, ["#!/bin/sh", `echo run >> "${runs}"`, "exit 42", ""].join("\n"));
+		chmodSync(python, 0o755);
+		const countRuns = () => {
+			try {
+				return readFileSync(runs, "utf8").split("\n").filter(Boolean).length;
+			} catch {
+				return 0;
+			}
+		};
+		const provisioner = new IpythonKernelProvisioner(dir, { python });
+		const crashed = { unexpectedExit: "code=null signal=SIGKILL", isRunning: false } as unknown as KernelManager;
+		Object.assign(
+			provisioner as unknown as { managerPromise: Promise<KernelManager>; startedManager: KernelManager },
+			{
+				managerPromise: Promise.resolve(crashed),
+				startedManager: crashed,
+			},
+		);
+
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			await expect(provisioner.ensure()).rejects.toThrow(/Kernel exited before resolving ports/);
+			expect(countRuns()).toBe(attempt);
+		}
+		expect(provisioner.canRestartAfterCrash).toBe(false);
+		await expect(provisioner.ensure()).rejects.toBeInstanceOf(KernelExitedUnexpectedlyError);
+		expect(countRuns()).toBe(3);
+	});
 });
 
 describe("describeKernelExit", () => {
